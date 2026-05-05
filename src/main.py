@@ -1,9 +1,17 @@
 import cmd
 import sys
+from src.crawler import WebCrawler
+from src.indexer import get_db_connection, initialise_database, index_page
+from src.search import search_query, get_word_index
 
 class SearchEngineShell(cmd.Cmd):
-    intro = 'Welcome to this Search Engine. Type help or ? to list commands.\n'
+    intro = 'Welcome to the Search Engine. Type help or ? to list commands.\n'
     prompt = '> '
+
+    def __init__(self):
+        super().__init__()
+        # Maintains the active database connection in memory
+        self.conn = None
 
     def do_build(self, arg):
         """
@@ -12,7 +20,30 @@ class SearchEngineShell(cmd.Cmd):
         Usage: build
         """
         print("Executing: Crawling site and building SQLite index...")
-        # TODO: Call crawler.py and indexer.py logic here
+        crawler = WebCrawler()
+        
+        # Setup a fresh database connection for the build process
+        build_conn = get_db_connection("index.sqlite")
+        initialise_database(build_conn)
+        
+        current_url = crawler.base_url
+        pages_indexed = 0
+        
+        while current_url:
+            html = crawler.fetch_page(current_url)
+            if not html:
+                print(f"Warning: Failed to fetch {current_url}. Stopping crawl.")
+                break
+                
+            text = crawler.extract_page_text(html)
+            index_page(build_conn, current_url, text)
+            pages_indexed += 1
+            
+            # The crawler module handles the politeness delay natively during fetch_page
+            current_url = crawler.extract_next_url(html, current_url)
+            
+        build_conn.close()
+        print(f"Build complete. Successfully crawled and indexed {pages_indexed} pages.")
 
     def do_load(self, arg):
         """
@@ -20,21 +51,36 @@ class SearchEngineShell(cmd.Cmd):
         Usage: load
         """
         print("Executing: Loading SQLite index from data/...")
-        # TODO: Establish SQLite connection here
+        try:
+            self.conn = get_db_connection("index.sqlite")
+            print("Index loaded successfully. You may now use 'print' and 'find'.")
+        except Exception as e:
+            print(f"Error loading database: {e}")
 
     def do_print(self, arg):
         """
         Prints the inverted index for a particular word.
         Usage: print <word>
         """
+        if not self.conn:
+            print("Error: You must run 'load' before printing.")
+            return
+            
         if not arg:
             print("Error: Please provide a word to print (e.g., 'print nonsense').")
             return
         
-        # Ensure case insensitivity
         word = arg.strip().lower()
-        print(f"Executing: Fetching inverted index for the word '{word}'...")
-        # TODO: Call database fetch logic here
+        results = get_word_index(self.conn, word)
+        
+        if not results:
+            print(f"The word '{word}' was not found in the index.")
+            return
+            
+        print(f"\nInverted index for '{word}':")
+        for url, frequency, positions in results:
+            print(f"  - URL: {url} | Frequency: {frequency} | Positions: {positions}")
+        print()
 
     def do_find(self, arg):
         """
@@ -42,20 +88,33 @@ class SearchEngineShell(cmd.Cmd):
         a list of all pages that contain it.
         Usage: find <query>
         """
+        if not self.conn:
+            print("Error: You must run 'load' before searching.")
+            return
+            
         if not arg:
-            print("Error: Please provide a query (e.g., 'find example query').")
+            print("Error: Please provide a query (e.g., 'find good friends').")
             return
         
         query = arg.strip().lower()
-        print(f"Executing: Searching for '{query}'...")
-        # TODO: Call search.py logic here
+        results = search_query(self.conn, query)
+        
+        if not results:
+            print(f"No pages found containing all terms in: '{query}'")
+            return
+            
+        print(f"\nSearch results for '{query}' (Ranked by relevance):")
+        for rank, url in enumerate(results, 1):
+            print(f"  {rank}. {url}")
+        print()
 
     def do_exit(self, arg):
         """Exits the search engine shell."""
+        if self.conn:
+            self.conn.close()
         print("Exiting search engine. Goodbye!")
         return True
 
-    # Allow 'quit' as an alias for 'exit'
     do_quit = do_exit
 
 if __name__ == '__main__':
