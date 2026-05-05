@@ -14,10 +14,9 @@ def get_db_connection(db_name="index.sqlite"):
 
 def initialise_database(conn):
     """
-    Creates the inverted index schema if it does not already exist.
+    Creates the inverted index schema and a metadata table for global statistics.
     """
     cursor = conn.cursor()
-    # IF NOT EXISTS to prevent overwriting an existing index safely
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS inverted_index (
             word TEXT,
@@ -28,7 +27,19 @@ def initialise_database(conn):
         )
     ''')
     
-    # Create a database index on the 'word' column
+    # New metadata table to track corpus-wide statistics
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value INTEGER
+        )
+    ''')
+    
+    # Initialize the document counter to 0 if it does not already exist
+    cursor.execute('''
+        INSERT OR IGNORE INTO metadata (key, value) VALUES ('total_documents', 0)
+    ''')
+    
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_word ON inverted_index(word)')
     conn.commit()
 
@@ -45,12 +56,11 @@ def normalise_text(text):
 def index_page(conn, url, raw_text):
     """
     Processes raw text, calculates frequencies and positions, 
-    and inserts the data into the SQLite database.
+    inserts the data, and updates the global document count.
     """
     words = normalise_text(raw_text)
     word_stats = {}
 
-    # Calculate frequencies and positions
     for position, word in enumerate(words):
         if word not in word_stats:
             word_stats[word] = {"frequency": 0, "positions": []}
@@ -58,22 +68,25 @@ def index_page(conn, url, raw_text):
         word_stats[word]["frequency"] += 1
         word_stats[word]["positions"].append(position)
 
-    # Prepare data for batch insertion
     db_rows = []
     for word, stats in word_stats.items():
         db_rows.append((
             word, 
             url, 
             stats["frequency"], 
-            json.dumps(stats["positions"]) # Convert list to JSON string for SQLite
+            json.dumps(stats["positions"]) 
         ))
 
-    # Parameterised queries prevent SQL injection
     cursor = conn.cursor()
     cursor.executemany('''
         INSERT OR REPLACE INTO inverted_index (word, url, frequency, positions)
         VALUES (?, ?, ?, ?)
     ''', db_rows)
+    
+    # Increment the global document counter for TF-IDF calculations
+    cursor.execute('''
+        UPDATE metadata SET value = value + 1 WHERE key = 'total_documents'
+    ''')
     
     conn.commit()
 
