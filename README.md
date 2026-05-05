@@ -1,7 +1,7 @@
 ## Repository Structure
 
 ```
-comp3011_CwK_2/
+COMP3011_CwK_2/
 ├── .github/
 │   └── workflows/
 │       └── python-app.yml     # (Stretch Feature) Automated testing pipeline for the 80-100 band
