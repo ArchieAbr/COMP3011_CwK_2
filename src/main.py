@@ -85,8 +85,9 @@ class SearchEngineShell(cmd.Cmd):
     def do_find(self, arg):
         """
         Finds a given query phrase in the inverted index and returns 
-        a list of all pages that contain it.
-        Usage: find <query>
+        a list of all pages that contain it, ranked by TF-IDF score.
+        Supports exact phrase matching using double quotes.
+        Usage: find <query> or find "<exact phrase>"
         """
         if not self.conn:
             print("Error: You must run 'load' before searching.")
@@ -96,16 +97,18 @@ class SearchEngineShell(cmd.Cmd):
             print("Error: Please provide a query (e.g., 'find good friends').")
             return
         
-        query = arg.strip().lower()
+        # We no longer strip quotes here, as search_query needs them to detect exact phrases
+        query = arg.strip()
         results = search_query(self.conn, query)
         
         if not results:
-            print(f"No pages found containing all terms in: '{query}'")
+            print(f"No pages found matching: '{query}'")
             return
             
-        print(f"\nSearch results for '{query}' (Ranked by relevance):")
-        for rank, url in enumerate(results, 1):
-            print(f"  {rank}. {url}")
+        print(f"\nSearch results for '{query}' (Ranked by TF-IDF Relevance):")
+        # Unpack the tuple to display both the URL and the algorithm's score
+        for rank, (url, score) in enumerate(results, 1):
+            print(f"  {rank}. {url} (Score: {score})")
         print()
 
     def do_exit(self, arg):
