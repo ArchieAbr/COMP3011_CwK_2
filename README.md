@@ -1,5 +1,6 @@
-# Repository Structure
+## Repository Structure
 
+```
 comp3011_CwK_2/
 ├── .github/
 │   └── workflows/
@@ -21,3 +22,4 @@ comp3011_CwK_2/
 ├── .gitignore                 # Crucial: prevents committing cache files and massive databases
 ├── requirements.txt           # Lists dependencies (requests, beautifulsoup4, pytest, pytest-mock)
 └── README.md                  # Comprehensive documentation, setup instructions, and complexity analysis
+```
