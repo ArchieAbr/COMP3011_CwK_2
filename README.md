@@ -4,9 +4,9 @@
 COMP3011_CwK_2/
 ├── .github/
 │   └── workflows/
-│       └── python-app.yml     # (Stretch Feature) Automated testing pipeline for the 80-100 band
+│       └── python-app.yml     # Automated testing pipeline
 ├── data/
-│   └── .gitkeep               # Keeps the empty folder in Git. Your SQLite index will save here.
+│   └── .gitkeep               # Keeps the empty folder in Git. SQLite index will save here.
 ├── src/
 │   ├── __init__.py            # Makes the src directory a discoverable Python package
 │   ├── crawler.py             # Handles the 6-second politeness window and HTML fetching
@@ -15,7 +15,7 @@ COMP3011_CwK_2/
 │   └── main.py                # The Command-Line Interface (build, load, print, find)
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py            # We will put our pytest fixtures (like the memory DB) in here
+│   ├── conftest.py            # Pytest fixtures
 │   ├── test_crawler.py        # Mocks network requests
 │   ├── test_indexer.py        # Tests text normalisation and DB insertion
 │   └── test_search.py         # Benchmarks the TF-IDF and frequency algorithms
