@@ -41,3 +41,40 @@ def test_index_page_updates_metadata(empty_db):
     result = cursor.fetchone()
     
     assert result[0] == 2
+
+
+def test_normalise_text_empty_string():
+    """Verifies that normalising an empty string returns an empty list."""
+    assert normalise_text("") == []
+
+
+def test_normalise_text_preserves_numbers():
+    """Verifies that numeric characters are retained after normalisation."""
+    result = normalise_text("chapter 3 has 42 pages")
+    assert "3" in result
+    assert "42" in result
+
+
+def test_index_page_updates_existing_word_on_reindex(empty_db):
+    """
+    Verifies INSERT OR REPLACE behaviour on the (word, url) primary key.
+    Re-indexing the same URL with a different frequency for the same word
+    must update the existing row rather than insert a duplicate.
+    """
+    url = "http://test.com"
+    # First pass: 'apple' appears once
+    index_page(empty_db, url, "apple")
+
+    cursor = empty_db.cursor()
+    cursor.execute("SELECT frequency FROM inverted_index WHERE word = ? AND url = ?", ("apple", url))
+    assert cursor.fetchone()[0] == 1
+
+    # Second pass: 'apple' now appears twice in the new text
+    index_page(empty_db, url, "apple apple")
+
+    cursor.execute("SELECT frequency FROM inverted_index WHERE word = ? AND url = ?", ("apple", url))
+    assert cursor.fetchone()[0] == 2
+
+    # There must still be only one row for this (word, url) pair — no duplicate inserted
+    cursor.execute("SELECT COUNT(*) FROM inverted_index WHERE word = ? AND url = ?", ("apple", url))
+    assert cursor.fetchone()[0] == 1

@@ -1,5 +1,5 @@
 import pytest
-from src.search import search_query, get_word_index
+from src.search import search_query, get_word_index, get_total_documents
 
 def test_search_boolean_and_logic(populated_db):
     """Tests that queries only return URLs containing ALL search terms."""
@@ -42,3 +42,37 @@ def test_search_empty_query(populated_db):
     
     results_spaces = search_query(populated_db, "   ")
     assert results_spaces == []
+
+
+def test_get_word_index_returns_empty_for_unknown_word(populated_db):
+    """Tests that get_word_index returns an empty list for a word not in the index."""
+    results = get_word_index(populated_db, "zzznomatch")
+    assert results == []
+
+
+def test_search_returns_empty_when_no_documents(empty_db):
+    """Tests that search_query returns an empty list when the index contains no documents."""
+    results = search_query(empty_db, "fox")
+    assert results == []
+
+
+def test_search_tfidf_orders_multiple_results(populated_db):
+    """
+    Tests that results with multiple matches are sorted in descending score order.
+    'brown fox' appears in page2 and page3. page3 does not have 'the' reducing its
+    IDF penalty, so both should be returned and page2 should rank first due to 'the'
+    contributing a positive (if small) score on top.
+    """
+    results = search_query(populated_db, "brown fox")
+    assert len(results) == 2
+    # Scores must be in descending order
+    scores = [score for _, score in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_search_single_word_exact_phrase(populated_db):
+    """Tests that a single word wrapped in quotes behaves like a normal single-word search."""
+    quoted_results = search_query(populated_db, '"fox"')
+    plain_results = search_query(populated_db, 'fox')
+    # Both should return the same set of URLs
+    assert {url for url, _ in quoted_results} == {url for url, _ in plain_results}
